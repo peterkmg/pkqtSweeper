@@ -7,12 +7,15 @@ from PySide6.QtWidgets import (
   QPushButton,
   QFrame,
   QVBoxLayout,
+  QHBoxLayout,
+  QGridLayout,
+  QStackedLayout,
   QWidget,
 )
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QSize
 
-from game import GameMode, GameState
+from game import GameMode, GameState, TileNumberColor
 
 
 class MenuButton(QPushButton):
@@ -139,31 +142,96 @@ class MenuFrame(QFrame):
 class GameFrame(QFrame):
   game_layout: QLayout
 
+  header: QWidget
+  header_layout: QLayout
+
+  grid: QWidget
+  grid_layout: QLayout
+
   def __init__(self):
     super().__init__()
 
-    layout = QVBoxLayout()
-    layout.addWidget(QLabel('Game Frame'))
+    layout = QVBoxLayout(self)
 
-    self.setLayout(layout)
+    header = QWidget(self)
+    header_layout = QHBoxLayout(header)
+    header_layout.addWidget(QLabel('mines', header))
+    header_layout.addWidget(QLabel('icon', header))
+    header_layout.addWidget(QLabel('timer', header))
+    self.header = header
+
+    layout.addWidget(header)
+
+    grid = QWidget(self)
+    grid_layout = QGridLayout(parent=grid, spacing=1, alignment=Qt.AlignCenter)
+    # grid_layout.setAlignment(Qt.AlignCenter)
+    # grid_layout.setSpacing(1)
+    grid_layout.setContentsMargins(0, 0, 0, 0)
+    self.grid_layout = grid_layout
+
+    grid.setLayout(grid_layout)
+    self.grid = grid
+
+    layout.addWidget(grid)
+
+    # self.setLayout(layout)
 
     self.game_layout = layout
 
+  def setup_grid(self, rows: int, cols: int, matrix: list[list[int]], callback):
+    for i in range(rows):
+      for j in range(cols):
+        self.grid_layout.addWidget(Tile(i, j, matrix[i][j], callback), i, j)
 
-class Tile(QPushButton):
-  def __init__(self, row, col, callback):
+    self.grid.setLayout(self.grid_layout)
+
+
+class Tile(QWidget):
+  row: int
+  col: int
+  val: int
+
+  index: int = 1
+  layout: QLayout
+
+  size: QSize = QSize(40, 40)
+
+  def __init__(self, row: int, col: int, val: int, callback):
     super().__init__()
 
     self.row = row
     self.col = col
+    self.val = val
 
-    self.clicked.connect(lambda: callback(row, col))
+    layout = QStackedLayout(self)
+    self.layout = layout
 
-    self.setFixedSize(40, 40)
-    self.setStyleSheet("""
-      background-color: #f0f0f0;
-      border: 1px solid #ccc;
-    """)
+    layout.addWidget(
+      QLabel(
+        parent=self,
+        text=str(val) if val > 0 else '',
+        alignment=Qt.AlignCenter,
+        size=self.size,
+        styleSheet=(
+          f'font-size: 18px; color: rgb{TileNumberColor.by_val(val).value}; font-weight: bold;' if val > 0 else ''
+        ),
+      )
+    )
+
+    layout.addWidget(
+      QPushButton(
+        parent=self,
+        size=self.size,
+        styleSheet='background-color: #f0f0f0;',
+        clicked=lambda: self.click_btn(callback),
+      )
+    )
+
+    layout.setCurrentIndex(self.index)
+
+  def open_tile(self, callback):
+    self.layout.setCurrentIndex(0)
+    callback(self.row, self.col, self.val)
 
 
 # create windows that has 2 frames
@@ -223,3 +291,8 @@ class Window(QMainWindow):
 
     self.frame_menu.hide()
     self.frame_game.show()
+
+    self.frame_game.setup_grid(self.state.rows, self.state.cols, self.state.matrix, self.open_tile)
+
+  def open_tile(self, row, col, val):
+    print(f'Opening tile at {row}, {col} with value {val}')

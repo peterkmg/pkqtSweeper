@@ -9,6 +9,38 @@ class GameMode(Enum):
   EXPERT = (99, 16, 30)
 
 
+# rgb
+class TileNumberColor(Enum):
+  # 1 is blue
+  ONE = (0, 0, 255)
+  # 2 is green
+  TWO = (0, 128, 0)
+  # 3 is red
+  THREE = (255, 0, 0)
+  # 4 is navy
+  FOUR = (0, 0, 128)
+  # 5 is maroon
+  FIVE = (128, 0, 0)
+  # 6 is teal
+  SIX = (0, 128, 128)
+  # 7 is black
+  SEVEN = (0, 0, 0)
+  # 8 is purple
+  EIGHT = (128, 0, 128)
+
+  def by_val(val: int):
+    return {
+      1: TileNumberColor.ONE,
+      2: TileNumberColor.TWO,
+      3: TileNumberColor.THREE,
+      4: TileNumberColor.FOUR,
+      5: TileNumberColor.FIVE,
+      6: TileNumberColor.SIX,
+      7: TileNumberColor.SEVEN,
+      8: TileNumberColor.EIGHT,
+    }[val]
+
+
 class GameState:
   mode: GameMode
   rows: int
