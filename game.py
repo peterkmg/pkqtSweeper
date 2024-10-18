@@ -9,6 +9,25 @@ class GameMode(Enum):
   EXPERT = (99, 16, 30)
 
 
+class TileButtonState(Enum):
+  DEFAULT = 0
+  FLAGGED = 1
+  QUESTION = 2
+
+  def next(self):
+    return {
+      TileButtonState.DEFAULT: TileButtonState.FLAGGED,
+      TileButtonState.FLAGGED: TileButtonState.QUESTION,
+      TileButtonState.QUESTION: TileButtonState.DEFAULT,
+    }[self]
+
+
+class TileEventType(Enum):
+  OPENSINGLE = 0
+  OPENSQUARE = 1
+  MARK = 2
+
+
 # rgb
 class TileNumberColor(Enum):
   # 1 is blue
@@ -58,9 +77,13 @@ class GameState:
 
     # get random mine placement
     self.mine_list = random.sample(range(self.rows * self.cols), self.mines)
+    self.mine_list.sort()
+    print(self.mine_list)
 
     # initialize test matrix
-    self.matrix = [[-1 if (i + j) in self.mine_list else 0 for j in range(self.cols)] for i in range(self.rows)]
+    self.matrix = [
+      [-1 if (i * self.cols + j) in self.mine_list else 0 for j in range(self.cols)] for i in range(self.rows)
+    ]
 
     # calculate mine count for each cell
     # iterate through matrix
@@ -73,3 +96,6 @@ class GameState:
             for x in range(max(0, col - 1), min(self.cols, col + 2)):
               if self.matrix[y][x] != -1:
                 self.matrix[y][x] += 1
+
+    for row in self.matrix:
+      print(row)
