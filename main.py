@@ -4,7 +4,6 @@ from window import GameWindow
 
 
 def main() -> None:
-  """Main entry point for the pkqt Minesweeper game."""
   app = QApplication(sys.argv)
   app.setApplicationName('pkqt Minesweeper')
   gw = GameWindow()

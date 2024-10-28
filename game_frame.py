@@ -1,5 +1,7 @@
 from typing import Callable
+from game import TileEventType, TileButtonState, TileNumberColor, GameState, GameMode
 from PySide6.QtCore import QSize, Qt, QTimer
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import (
   QFrame,
   QVBoxLayout,
@@ -12,30 +14,23 @@ from PySide6.QtWidgets import (
   QLCDNumber,
   QApplication,
 )
-from PySide6.QtGui import QMouseEvent
-
-from game import TileEventType, TileButtonState, TileNumberColor, GameState, GameMode
-
-import emoji
 
 
 class TileButton(QPushButton):
-  size: QSize = QSize(36, 36)
-  state: TileButtonState = TileButtonState.DEFAULT
+  __slots__ = 'state'
 
-  def __init__(self, text: str, parent: QWidget = None):
-    super().__init__(text, parent=parent)
+  def __init__(self, text: str, parent: QWidget = None) -> None:
+    super().__init__(text, parent)
 
-    self.setFixedSize(self.size)
-    self.setMouseTracking(False)
-
+    self.setFixedSize(QSize(36, 36))
+    self.state = TileButtonState.DEFAULT
     self.setStyleSheet("""
       font-size: 18px;
       padding: 5px 10px;
       background-color: #e0e0e0;
     """)
 
-  def decorate_button(self) -> None:
+  def __decorate_button(self) -> None:
     match self.state:
       case TileButtonState.DEFAULT:
         self.setText('')
@@ -46,7 +41,7 @@ class TileButton(QPushButton):
 
   def cycle_state(self) -> None:
     self.state = TileButtonState.next(self.state)
-    self.decorate_button()
+    self.__decorate_button()
 
   # button hijacks left mouse clicks => propagate event to parent
   def mouseReleaseEvent(self, e: QMouseEvent) -> None:
@@ -57,238 +52,243 @@ class TileButton(QPushButton):
 
 
 class Tile(QStackedWidget):
-  size: QSize = QSize(40, 40)
+  __slots__ = (
+    '__row',
+    '__col',
+    '__val',
+    '__label',
+    '__label_idx',
+    '__btn',
+    '__btn_idx',
+    '__revealed',
+    '__flagged',
+    '__tile_event_callback',
+  )
 
-  row: int
-  col: int
-  val: int
+  def __init__(
+    self, row: int, col: int, val: int, callback: Callable[[TileEventType, 'Tile'], None], parent: QWidget = None
+  ) -> None:
+    super().__init__(parent)
 
-  label: QLabel
-  label_idx: int
-  btn: TileButton
-  btn_idx: int
-
-  revealed: bool = False
-  flagged: bool = False
-
-  tile_event_callback: Callable[[TileEventType, 'Tile'], None]
-
-  def __init__(self, row: int, col: int, val: int, callback: Callable[[TileEventType, 'Tile'], None]):
-    super().__init__()
-
-    self.row = row
-    self.col = col
-    self.val = val
-
-    self.tile_event_callback = callback
-
-    # set tile params
+    self.__row = row
+    self.__col = col
+    self.__val = val
+    self.__tile_event_callback = callback
+    self.__revealed = False
+    self.__flagged = False
     self.setStyleSheet('background-color: #f0f0f0;')
-    self.setFixedSize(self.size)
+    self.setFixedSize(QSize(40, 40))
 
-    self.label = QLabel(
+    self.__label = QLabel(
       parent=self,
       text=str(val) if val > 0 else ('💥' if val == -1 else ''),
       alignment=Qt.AlignCenter,
-      size=self.size,
       styleSheet=(
-        val > 0
-        and f'font-size: 18px; color: rgb{TileNumberColor.by_val(val).value}; font-weight: bold;'
-        or 'font-size: 18px;font-weight: bold;'
+        f'font-size: 18px; color: rgb{TileNumberColor.by_val(val).value}; font-weight: bold;'
+        if val > 0
+        else 'font-size: 18px;font-weight: bold;'
       ),
     )
 
-    self.btn = TileButton('', parent=self)
+    self.__btn = TileButton(text='', parent=self)
 
-    self.addWidget(self.label)
-    self.addWidget(self.btn)
+    self.addWidget(self.__label)
+    self.addWidget(self.__btn)
 
-    self.label_idx = self.indexOf(self.label)
-    self.btn_idx = self.indexOf(self.btn)
+    self.__label_idx = self.indexOf(self.__label)
+    self.__btn_idx = self.indexOf(self.__btn)
 
-    self.setCurrentIndex(self.btn_idx)
+    self.setCurrentIndex(self.__btn_idx)
 
-  # attach event handler to tile to avoid processing mouse events on any other widgets we don't care about
+  @property
+  def row(self) -> int:
+    return self.__row
+
+  @property
+  def col(self) -> int:
+    return self.__col
+
+  @property
+  def val(self) -> int:
+    return self.__val
+
+  @property
+  def flagged(self) -> bool:
+    return self.__flagged
+
+  @property
+  def revealed(self) -> bool:
+    return self.__revealed
+
   def mouseReleaseEvent(self, event: QMouseEvent) -> None:
     match event.button():
       case Qt.LeftButton:  # left click, only care if tile is not revealed or protected
-        self.tile_event_callback(TileEventType.OPENSINGLE, self)
+        self.__tile_event_callback(TileEventType.OPENSINGLE, self)
       case Qt.MiddleButton:  # middle click, only care if tile is revealed
-        self.tile_event_callback(TileEventType.OPENSQUARE, self)
+        self.__tile_event_callback(TileEventType.OPENSQUARE, self)
       case Qt.RightButton:  # right click, only care if tile is not revealed
-        self.tile_event_callback(TileEventType.MARK, self)
+        self.__tile_event_callback(TileEventType.MARK, self)
 
     return super().mousePressEvent(event)
 
   def change_mark(self) -> None:
-    self.btn.cycle_state()
-    if self.flagged and self.btn.state != TileButtonState.FLAGGED:
-      self.flagged = False
-    elif self.btn.state == TileButtonState.FLAGGED and not self.flagged:
-      self.flagged = True
+    self.__btn.cycle_state()
+    if self.__flagged and self.__btn.state != TileButtonState.FLAGGED:
+      self.__flagged = False
+    elif self.__btn.state == TileButtonState.FLAGGED and not self.__flagged:
+      self.__flagged = True
 
   def reveal_tile(self) -> None:
-    self.revealed = True
-    self.setCurrentIndex(self.label_idx)
+    self.__revealed = True
+    self.setCurrentIndex(self.__label_idx)
 
 
 class GameHeader(QWidget):
-  lcd_mines: QLCDNumber
-  lcd_timer: QLCDNumber
+  __slots__ = ('__lcd_mines', '__lcd_timer', '__stopwatch')
 
-  stopwatch: QTimer
-
-  restart_callback: Callable[[], None]
-
-  def __init__(self, restart_callback: Callable[[], None], activate_menu_callback: Callable[[], None]):
-    super().__init__()
+  def __init__(self, restart: Callable[[], None], activate_menu: Callable[[], None], parent: QWidget = None) -> None:
+    super().__init__(parent)
 
     layout = QHBoxLayout(self)
 
-    btn_menu = QPushButton(parent=self, text='Menu', clicked=activate_menu_callback)
+    btn_menu = QPushButton(parent=self, text='Menu', clicked=activate_menu)
     btn_menu.setFixedSize(100, 40)
-    btn_restart = QPushButton(parent=self, text='Restart', clicked=restart_callback)
+    btn_restart = QPushButton(parent=self, text='Restart', clicked=restart)
     btn_restart.setFixedSize(100, 40)
 
-    self.lcd_mines = QLCDNumber(parent=self, digitCount=3, size=QSize(100, 40), mode=QLCDNumber.Dec)
-    self.lcd_timer = QLCDNumber(parent=self, digitCount=3, size=QSize(100, 40), mode=QLCDNumber.Dec)
+    self.__lcd_mines = QLCDNumber(parent=self, digitCount=3, size=QSize(100, 40), mode=QLCDNumber.Dec)
+    self.__lcd_timer = QLCDNumber(parent=self, digitCount=3, size=QSize(100, 40), mode=QLCDNumber.Dec)
 
-    self.stopwatch = QTimer(
+    self.__stopwatch = QTimer(
       parent=self,
-      timeout=lambda: self.lcd_timer.display(self.lcd_timer.intValue() + 1),
+      timeout=lambda: self.__lcd_timer.display(self.__lcd_timer.intValue() + 1),
       interval=1000,
       singleShot=False,
     )
 
-    layout.addWidget(self.lcd_mines, 1, Qt.AlignLeft)
+    layout.addWidget(self.__lcd_mines, 1, Qt.AlignLeft)
     layout.addWidget(btn_menu, 1, Qt.AlignCenter)
     layout.addWidget(btn_restart, 1, Qt.AlignCenter)
-    layout.addWidget(self.lcd_timer, 1, Qt.AlignRight)
+    layout.addWidget(self.__lcd_timer, 1, Qt.AlignRight)
 
-  def set_mines(self, mines: int) -> None:
-    self.lcd_mines.display(mines)
+  @property
+  def mines(self) -> int:
+    return self.__lcd_mines.intValue()
+
+  @mines.setter
+  def mines(self, value: int) -> None:
+    self.__lcd_mines.display(value)
 
   def new_timer(self) -> None:
-    self.lcd_timer.display(0)
-    self.stopwatch.start()
+    self.__lcd_timer.display(0)
+    self.__stopwatch.start()
 
   def halt_timer(self) -> int:
-    self.stopwatch.stop()
-    return self.lcd_timer.intValue()
+    self.__stopwatch.stop()
+    return self.__lcd_timer.intValue()
 
   def decrement_mines(self) -> None:
-    self.lcd_mines.display(self.lcd_mines.intValue() - 1)
+    self.__lcd_mines.display(self.__lcd_mines.intValue() - 1)
 
   def increment_mines(self) -> None:
-    self.lcd_mines.display(self.lcd_mines.intValue() + 1)
+    self.__lcd_mines.display(self.__lcd_mines.intValue() + 1)
 
 
 class GameFrame(QFrame):
-  header: GameHeader
-  grid: QWidget = None
-
-  state: GameState
-
-  active: bool = False
-  open_tiles: int
-  win_condition: int
-
-  resize_callback: Callable[[int, int], None]
-  finish_callback: Callable[[bool], None]
-  activate_menu_frame: Callable[[], None]
-
-  open_queue: set[Tile] = set()
+  __slots__ = (
+    '__header',
+    '__grid',
+    '__state',
+    '__active',
+    '__open_tiles',
+    '__win_condition',
+    '__resize_callback',
+    '__finish_callback',
+    '__open_queue',
+  )
 
   def __init__(
     self,
     finish_callback: Callable[[int, int], None],
     resize_callback: Callable[[int, int], None],
-    activate_menu_frame: Callable[[], None],
-  ):
-    super().__init__()
+    activate_menu: Callable[[], None],
+    parent: QWidget = None,
+  ) -> None:
+    super().__init__(parent)
 
     self.setStyleSheet("""
       margin: 0px 0px;
       background-color: #f0f0f0f0;
     """)
-
-    self.resize_callback = resize_callback
-    self.finish_callback = finish_callback
-    self.activate_menu_frame = activate_menu_frame
-
-    self.state = GameState()
+    self.__open_queue: set[Tile] = set()
+    self.__grid: QWidget = None
+    self.__resize_callback = resize_callback
+    self.__finish_callback = finish_callback
+    self.__state = GameState()
 
     layout = QVBoxLayout(self)
-    self.header = GameHeader(self.create_game, activate_menu_frame)
-    layout.addWidget(self.header)
+    self.__header = GameHeader(self.__create_game, activate_menu, self)
+    layout.addWidget(self.__header)
 
-  def activate(self, mode: GameMode) -> None:
-    self.state.set_mode(mode)
-    self.create_game()
+  def __render_grid(self) -> None:
+    if self.__grid is not None:
+      self.layout().removeWidget(self.__grid)
+      self.__grid.deleteLater()
 
-  def render_grid(self) -> None:
-    if self.grid is not None:
-      self.layout().removeWidget(self.grid)
-      self.grid.deleteLater()
+    self.__grid = QWidget(parent=self, layout=QGridLayout())
+    self.layout().addWidget(self.__grid)
 
-    self.grid = QWidget(parent=self, layout=QGridLayout())
-    self.layout().addWidget(self.grid)
+    self.__open_tiles = 0
+    self.__win_condition = self.__state.rows * self.__state.cols - self.__state.mines
 
-    self.rows = self.state.rows
-    self.cols = self.state.cols
+    layout = self.__grid.layout()
+    for i in range(self.__state.rows):
+      for j in range(self.__state.cols):
+        layout.addWidget(Tile(i, j, self.__state.matrix[i][j], self.__handle_tile_event, self.__grid), i, j)
 
-    self.open_tiles = 0
-    self.win_condition = self.state.rows * self.state.cols - self.state.mines
+    self.setFixedSize((self.__state.cols + 1) * 40, (self.__state.rows + 1) * 40)
+    self.__header.mines = self.__state.mines
+    self.__resize_callback((self.__state.cols + 1) * 40, (self.__state.rows + 1) * 40)
+    self.__active = True
+    self.__header.new_timer()
 
-    layout = self.grid.layout()
-    for i in range(self.state.rows):
-      for j in range(self.state.cols):
-        layout.addWidget(Tile(i, j, self.state.matrix[i][j], self.handle_tile_event), i, j)
+  def __create_game(self) -> None:
+    self.__state.create_state()
+    self.__render_grid()
 
-    self.setFixedSize((self.state.cols + 1) * 40, (self.state.rows + 1) * 40)
-    self.header.set_mines(self.state.mines)
-    self.resize_callback((self.state.cols + 1) * 40, (self.state.rows + 1) * 40)
-    self.active = True
-    self.header.new_timer()
-
-  def create_game(self) -> None:
-    self.state.create_state()
-    self.render_grid()
-
-  def handle_tile_event(self, event: TileEventType, tile: Tile) -> None:
-    if not self.active:
+  def __handle_tile_event(self, event: TileEventType, tile: Tile) -> None:
+    if not self.__active:
       return
 
     match event:
       case TileEventType.OPENSINGLE:
-        self.process_tile(tile)
+        self.__process_tile(tile)
       case TileEventType.OPENSQUARE:
-        self.process_square(tile)
+        self.__process_square(tile)
       case TileEventType.MARK:
-        self.process_mark(tile)
+        self.__process_mark(tile)
 
-  def open_tile(self, tile: Tile) -> None:
+  def __open_tile(self, tile: Tile) -> None:
     tile.reveal_tile()
-    self.open_tiles += 1
+    self.__open_tiles += 1
 
-    if tile.val == -1 or self.open_tiles == self.win_condition:
-      self.active = False
-      self.finish_callback(tile.val != -1, self.header.halt_timer())
+    if tile.val == -1 or self.__open_tiles == self.__win_condition:
+      self.__active = False
+      self.__finish_callback(tile.val != -1, self.__header.halt_timer())
 
-  def process_tile(self, tile: Tile) -> None:
+  def __process_tile(self, tile: Tile) -> None:
     if tile.flagged or tile.revealed:
       return
 
-    self.open_tile(tile)
+    self.__open_tile(tile)
 
     if tile.val == 0:
-      self.enqueue_adjacent(tile)
+      self.__enqueue_adjacent(tile)
 
-    self.process_queue()
+    self.__process_queue()
 
-  def process_square(self, tile: Tile) -> None:
-    # only process if value is equal to number of flagged adjacent tiles
-    layout = self.grid.layout()
+  def __process_square(self, tile: Tile) -> None:
+    layout = self.__grid.layout()
     flagged = 0
     tiles = set()
     for i in range(-1, 2):
@@ -296,7 +296,7 @@ class GameFrame(QFrame):
         x = tile.row + i
         y = tile.col + j
 
-        if x < 0 or x >= self.rows or y < 0 or y >= self.cols:
+        if x < 0 or x >= self.__state.rows or y < 0 or y >= self.__state.cols:
           continue
 
         if layout.itemAtPosition(x, y).widget().flagged:
@@ -305,20 +305,20 @@ class GameFrame(QFrame):
           tiles.add(layout.itemAtPosition(x, y).widget())
 
     if flagged == tile.val:
-      self.open_queue = self.open_queue.union(tiles)
-      self.process_queue()
+      self.__open_queue = self.__open_queue.union(tiles)
+      self.__process_queue()
 
-  def process_mark(self, tile: Tile) -> None:
+  def __process_mark(self, tile: Tile) -> None:
     if not tile.revealed:
       flagged = tile.flagged
       tile.change_mark()
       if flagged and not tile.flagged:
-        self.header.increment_mines()
+        self.__header.increment_mines()
       elif not flagged and tile.flagged:
-        self.header.decrement_mines()
+        self.__header.decrement_mines()
 
-  def enqueue_adjacent(self, tile) -> None:
-    layout = self.grid.layout()
+  def __enqueue_adjacent(self, tile) -> None:
+    layout = self.__grid.layout()
     for i in range(-1, 2):
       for j in range(-1, 2):
         if i == 0 and j == 0:
@@ -327,12 +327,16 @@ class GameFrame(QFrame):
         x = tile.row + i
         y = tile.col + j
 
-        if x < 0 or x >= self.rows or y < 0 or y >= self.cols:
+        if x < 0 or x >= self.__state.rows or y < 0 or y >= self.__state.cols:
           continue
 
-        self.open_queue.add(layout.itemAtPosition(x, y).widget())
+        self.__open_queue.add(layout.itemAtPosition(x, y).widget())
 
-  def process_queue(self) -> None:
-    while self.open_queue:
-      tile = self.open_queue.pop()
-      self.process_tile(tile)
+  def __process_queue(self) -> None:
+    while self.__open_queue:
+      tile = self.__open_queue.pop()
+      self.__process_tile(tile)
+
+  def activate(self, mode: GameMode) -> None:
+    self.__state.mode = mode
+    self.__create_game()

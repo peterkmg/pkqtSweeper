@@ -1,3 +1,5 @@
+from menu_frame import MenuFrame
+from game_frame import GameFrame
 from PySide6.QtWidgets import (
   QMainWindow,
   QVBoxLayout,
@@ -5,67 +7,48 @@ from PySide6.QtWidgets import (
   QMessageBox,
 )
 
-from menu_frame import MenuFrame
-from game_frame import GameFrame
-
-
-class InfoBox(QMessageBox):
-  def __init__(self, text: str, title: str, icon: QMessageBox.Icon):
-    super().__init__()
-
-    self.setText(text)
-    self.setWindowTitle(title)
-    self.setIcon(icon)
-    self.setStandardButtons(QMessageBox.Ok)
-    self.setDefaultButton(QMessageBox.Ok)
-
 
 class GameWindow(QMainWindow):
-  root: QWidget
+  __slots__ = ('__root', '__frame_menu', '__frame_game')
 
-  frame_menu: MenuFrame
-  frame_game: GameFrame
-
-  def __init__(self):
+  def __init__(self) -> None:
     super().__init__()
-
-    # set window title and size
     self.setWindowTitle('pkqt Minesweeper')
 
-    self.root = QWidget(parent=self)
-    layout = QVBoxLayout(self.root)
+    self.__root = QWidget(parent=self)
+    layout = QVBoxLayout(self.__root)
 
-    self.frame_menu = MenuFrame(self.resize_window, self.activate_game_frame)
-    self.frame_game = GameFrame(self.finish_game, self.resize_window, self.activate_menu_frame)
+    self.__frame_menu = MenuFrame(self.__resize_window, self.__activate_game_frame)
+    self.__frame_game = GameFrame(self.__finish_game, self.__resize_window, self.__activate_menu_frame)
 
-    layout.addWidget(self.frame_menu, 1)
-    layout.addWidget(self.frame_game, 1)
+    layout.addWidget(self.__frame_menu, 1)
+    layout.addWidget(self.__frame_game, 1)
 
-    self.setCentralWidget(self.root)
+    self.setCentralWidget(self.__root)
+    self.__activate_menu_frame()
 
-    # show menu frame by default
-    self.activate_menu_frame()
+  def __activate_menu_frame(self) -> None:
+    self.__frame_menu.show()
+    self.__frame_game.hide()
+    self.__frame_menu.activate()
 
-  def activate_menu_frame(self) -> None:
-    self.frame_menu.show()
-    self.frame_game.hide()
-    self.frame_menu.activate()
+  def __activate_game_frame(self, mode: str) -> None:
+    self.__frame_menu.hide()
+    self.__frame_game.show()
+    self.__frame_game.activate(mode)
 
-  def activate_game_frame(self, mode) -> None:
-    self.frame_menu.hide()
-    self.frame_game.show()
-    self.frame_game.activate(mode)
-
-  def resize_window(self, width: int, height: int) -> None:
+  def __resize_window(self, width: int, height: int) -> None:
     self.setFixedSize(width + 20, height + 20)
 
-  def finish_game(self, win: bool, time: int) -> None:
-    msg = QMessageBox(
+  def __finish_game(self, win: bool, time: int) -> None:
+    msg = f'You won!\nFinished in {time} seconds!' if win else 'Boom! You lost!'
+    icon = QMessageBox.Information if win else QMessageBox.Critical
+
+    QMessageBox(
       parent=self,
       windowTitle='Game Ended',
-      text=win and f'You won!\nFinished in {time} seconds!' or 'Boom! You lost!',
+      text=msg,
       standardButtons=QMessageBox.Ok,
       defaultButton=QMessageBox.Ok,
-      icon=win and QMessageBox.Information or QMessageBox.Critical,
-    )
-    msg.exec()
+      icon=icon,
+    ).exec()

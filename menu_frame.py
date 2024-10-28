@@ -1,34 +1,22 @@
 from typing import Callable
-from PySide6.QtWidgets import QFrame, QVBoxLayout, QLabel, QGroupBox, QPushButton, QLayout, QApplication
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QLabel, QGroupBox, QPushButton, QApplication
 from PySide6.QtCore import Qt, QSize
+from dataclasses import dataclass
 
 from game import GameMode
 
 
-# class MenuButton(QPushButton):
-#   def __init__(self, text: str, height: int, callback):
-#     super().__init__(text)
-
-#     self.setFixedHeight(height)
-#     self.clicked.connect(callback)
-
-#     self.setStyleSheet("""
-#       font-size: 18px;
-#       padding: 5px 10px;
-#     """)
+@dataclass(frozen=True)
+class BtnCfg:
+  size: QSize = QSize(200, 180)
+  height: int = 40
+  group_height: int = 250
 
 
 class MenuFrame(QFrame):
-  btn_size: QSize = QSize(200, 180)
-  btn_height: int = 40
-  btn_group_size: int = 250
+  __slots__ = ('__resize_window_callback', '__main_btn_group', '__mode_select_btn_group')
 
-  main_btn_group: QGroupBox
-  mode_select_btn_group: QGroupBox
-
-  resize_window_callback: Callable[[int, int], None]
-
-  def __init__(self, resize_window: Callable[[int, int], None], activate_game: Callable[[GameMode], None]):
+  def __init__(self, resize_window: Callable[[int, int], None], activate_game: Callable[[GameMode], None]) -> None:
     super().__init__()
 
     self.setStyleSheet("""
@@ -36,7 +24,7 @@ class MenuFrame(QFrame):
       margin: 0px 15px;
     """)
 
-    self.resize_window_callback = resize_window
+    self.__resize_window_callback = resize_window
 
     layout = QVBoxLayout(self)
 
@@ -50,49 +38,51 @@ class MenuFrame(QFrame):
     """,
     )
 
-    # main menu
+    self.__main_btn_group = self.__create_main_menu_group()
+    self.__mode_select_btn_group = self.__create_mode_select_group(activate_game)
+
+    footer = QLabel('Created by PK', parent=self, styleSheet='font-size: 12px;', alignment=Qt.AlignCenter)
+
+    layout.addWidget(header, 1)
+    layout.addWidget(self.__main_btn_group)
+    layout.addWidget(self.__mode_select_btn_group)
+    layout.addWidget(footer, 1)
+
+    self.__show_first_page(True)
+
+  def __create_main_menu_group(self) -> QGroupBox:
     main_group = QGroupBox('Main Menu', parent=self)
-    main_group.setFixedHeight(self.btn_group_size)
+    main_group.setFixedHeight(BtnCfg.group_height)
     main_group_layout = QVBoxLayout(main_group)
 
-    btn_new_game = self.make_button('New Game', self.btn_height, lambda: self.show_first_page(False))
-    btn_exit = self.make_button('Exit', self.btn_height, lambda: QApplication.instance().quit())
+    btn_new_game = self.__make_button('New Game', BtnCfg.height, lambda: self.__show_first_page(False))
+    btn_exit = self.__make_button('Exit', BtnCfg.height, lambda: QApplication.instance().quit())
 
     main_group_layout.addWidget(btn_new_game)
     main_group_layout.addWidget(btn_exit)
 
-    self.main_btn_group = main_group
+    return main_group
 
-    # game mode selection
+  def __create_mode_select_group(self, activate_game: Callable[[GameMode], None]) -> QGroupBox:
     mode_group = QGroupBox('Select difficulty')
-    mode_group.setFixedHeight(self.btn_group_size)
+    mode_group.setFixedHeight(BtnCfg.group_height)
     mode_group_layout = QVBoxLayout(mode_group)
 
-    btn_start_beginner = self.make_button('Beginner', self.btn_height, lambda: activate_game(GameMode.BEGINNER))
-    btn_start_intermediate = self.make_button(
-      'Intermediate', self.btn_height, lambda: activate_game(GameMode.INTERMEDIATE)
+    btn_start_beginner = self.__make_button('Beginner', BtnCfg.height, lambda: activate_game(GameMode.BEGINNER))
+    btn_start_intermediate = self.__make_button(
+      'Intermediate', BtnCfg.height, lambda: activate_game(GameMode.INTERMEDIATE)
     )
-    btn_start_expert = self.make_button('Expert', self.btn_height, lambda: activate_game(GameMode.EXPERT))
-    btn_back = self.make_button('Back', self.btn_height, lambda: self.show_first_page(True))
+    btn_start_expert = self.__make_button('Expert', BtnCfg.height, lambda: activate_game(GameMode.EXPERT))
+    btn_back = self.__make_button('Back', BtnCfg.height, lambda: self.__show_first_page(True))
 
     mode_group_layout.addWidget(btn_start_beginner)
     mode_group_layout.addWidget(btn_start_intermediate)
     mode_group_layout.addWidget(btn_start_expert)
     mode_group_layout.addWidget(btn_back)
-    self.mode_select_btn_group = mode_group
 
-    ## footer
-    footer = QLabel('Created by PK', parent=self, styleSheet='font-size: 12px;', alignment=Qt.AlignCenter)
+    return mode_group
 
-    # populate layout
-    layout.addWidget(header, 1)
-    layout.addWidget(main_group)
-    layout.addWidget(mode_group)
-    layout.addWidget(footer, 1)
-
-    self.show_first_page(True)
-
-  def make_button(self, text: str, height: int, callback: Callable) -> QPushButton:
+  def __make_button(self, text: str, height: int, callback: Callable) -> QPushButton:
     btn = QPushButton(
       parent=self,
       text=text,
@@ -101,10 +91,10 @@ class MenuFrame(QFrame):
     btn.setFixedHeight(height)
     return btn
 
-  def activate(self):
-    self.resize_window_callback(400, 400)
-    self.show_first_page(True)
+  def __show_first_page(self, flag: bool) -> None:
+    self.__main_btn_group.setHidden(not flag)
+    self.__mode_select_btn_group.setHidden(flag)
 
-  def show_first_page(self, flag: bool):
-    self.main_btn_group.setHidden(not flag)
-    self.mode_select_btn_group.setHidden(flag)
+  def activate(self) -> None:
+    self.__resize_window_callback(400, 400)
+    self.__show_first_page(True)

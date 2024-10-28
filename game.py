@@ -1,8 +1,7 @@
-from enum import Enum
 import random
+from enum import Enum
 
 
-# value represents (mines, rows, columns)
 class GameMode(Enum):
   BEGINNER = (10, 9, 9)
   INTERMEDIATE = (40, 16, 16)
@@ -14,7 +13,7 @@ class TileButtonState(Enum):
   FLAGGED = 1
   QUESTION = 2
 
-  def next(self):
+  def next(self) -> 'TileButtonState':
     return {
       TileButtonState.DEFAULT: TileButtonState.FLAGGED,
       TileButtonState.FLAGGED: TileButtonState.QUESTION,
@@ -47,7 +46,8 @@ class TileNumberColor(Enum):
   # 8 is purple
   EIGHT = (128, 0, 128)
 
-  def by_val(val: int):
+  @staticmethod
+  def by_val(val: int) -> 'TileNumberColor':
     return {
       1: TileNumberColor.ONE,
       2: TileNumberColor.TWO,
@@ -61,30 +61,48 @@ class TileNumberColor(Enum):
 
 
 class GameState:
-  mode: GameMode = None
-  rows: int
-  cols: int
-  mines: int
+  __slots__ = ('__mode', '__rows', '__cols', '__mines', '__matrix')
 
-  matrix: list[list[int]]
+  @property
+  def rows(self) -> int:
+    return self.__rows
 
-  def set_mode(self, mode: GameMode):
-    self.mode = mode
+  @property
+  def cols(self) -> int:
+    return self.__cols
 
-  def create_state(self):
-    if self.mode is None:
+  @property
+  def mines(self) -> int:
+    return self.__mines
+
+  @property
+  def matrix(self) -> list[list[int]]:
+    return self.__matrix
+
+  @property
+  def mode(self) -> GameMode:
+    return self.__mode
+
+  @mode.setter
+  def mode(self, mode: GameMode) -> None:
+    self.__mode = mode
+
+  def create_state(self) -> None:
+    if self.__mode is None:
       raise ValueError('Game mode is not set')
 
-    (self.mines, self.rows, self.cols) = self.mode.value
+    (self.__mines, self.__rows, self.__cols) = self.__mode.value
 
-    mine_list = random.sample(range(self.rows * self.cols), self.mines)
+    mine_list = random.sample(range(self.__rows * self.__cols), self.__mines)
     mine_list.sort()
-    self.matrix = [[-1 if (i * self.cols + j) in mine_list else 0 for j in range(self.cols)] for i in range(self.rows)]
+    self.__matrix = [
+      [-1 if (i * self.__cols + j) in mine_list else 0 for j in range(self.__cols)] for i in range(self.__rows)
+    ]
 
-    for row in range(self.rows):
-      for col in range(self.cols):
-        if self.matrix[row][col] == -1:
-          for y in range(max(0, row - 1), min(self.rows, row + 2)):
-            for x in range(max(0, col - 1), min(self.cols, col + 2)):
-              if self.matrix[y][x] != -1:
-                self.matrix[y][x] += 1
+    for row in range(self.__rows):
+      for col in range(self.__cols):
+        if self.__matrix[row][col] == -1:
+          for y in range(max(0, row - 1), min(self.__rows, row + 2)):
+            for x in range(max(0, col - 1), min(self.__cols, col + 2)):
+              if self.__matrix[y][x] != -1:
+                self.__matrix[y][x] += 1
