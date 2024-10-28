@@ -61,34 +61,26 @@ class TileNumberColor(Enum):
 
 
 class GameState:
-  mode: GameMode
+  mode: GameMode = None
   rows: int
   cols: int
   mines: int
 
-  mine_list: list[int]
   matrix: list[list[int]]
 
-  def __init__(self, mode: GameMode):
+  def set_mode(self, mode: GameMode):
     self.mode = mode
-    self.mines = mode.value[0]
-    self.rows = mode.value[1]
-    self.cols = mode.value[2]
 
-    # get random mine placement
-    self.mine_list = random.sample(range(self.rows * self.cols), self.mines)
-    self.mine_list.sort()
-    print(self.mine_list)
+  def create_state(self):
+    if self.mode is None:
+      raise ValueError('Game mode is not set')
 
-    # initialize test matrix
-    self.matrix = [
-      [-1 if (i * self.cols + j) in self.mine_list else 0 for j in range(self.cols)] for i in range(self.rows)
-    ]
+    (self.mines, self.rows, self.cols) = self.mode.value
 
-    # calculate mine count for each cell
-    # iterate through matrix
-    # if mine found increase count for all adjacent cells (considering board limits)
-    # unless cell value is -1 (mine)
+    mine_list = random.sample(range(self.rows * self.cols), self.mines)
+    mine_list.sort()
+    self.matrix = [[-1 if (i * self.cols + j) in mine_list else 0 for j in range(self.cols)] for i in range(self.rows)]
+
     for row in range(self.rows):
       for col in range(self.cols):
         if self.matrix[row][col] == -1:
@@ -96,6 +88,3 @@ class GameState:
             for x in range(max(0, col - 1), min(self.cols, col + 2)):
               if self.matrix[y][x] != -1:
                 self.matrix[y][x] += 1
-
-    for row in self.matrix:
-      print(row)

@@ -2,12 +2,8 @@ from PySide6.QtWidgets import (
   QMainWindow,
   QVBoxLayout,
   QWidget,
-  QSizePolicy,
   QMessageBox,
 )
-
-
-from game import GameState
 
 from menu_frame import MenuFrame
 from game_frame import GameFrame
@@ -24,42 +20,23 @@ class InfoBox(QMessageBox):
     self.setDefaultButton(QMessageBox.Ok)
 
 
-# create windows that has 2 frames
-# one is menu frame where player can select to start the game or exit
-# (and select game difficulty)
-# another is game frame where the game is played
-# menu frame is shown on the initial start of the game
-class Window(QMainWindow):
-  width: int = 400
-  height: int = 400
-
+class GameWindow(QMainWindow):
   root: QWidget
-  # root_layout: QLayout
 
   frame_menu: MenuFrame
   frame_game: GameFrame
-
-  state: GameState
 
   def __init__(self):
     super().__init__()
 
     # set window title and size
     self.setWindowTitle('pkqt Minesweeper')
-    # self.setFixedSize(self.width, self.height)
-    self.setMinimumHeight(250)
-    self.setMinimumWidth(250)
-    self.setSizePolicy(QSizePolicy.MinimumExpanding, QSizePolicy.MinimumExpanding)
 
     self.root = QWidget(parent=self)
     layout = QVBoxLayout(self.root)
 
-    # construct everything from bottom up
-    self.frame_menu = MenuFrame(self.start_game)
-    self.frame_menu.hide()
-
-    self.frame_game = GameFrame(self.finish_game)
-    self.frame_game.hide()
+    self.frame_menu = MenuFrame(self.resize_window, self.activate_game_frame)
+    self.frame_game = GameFrame(self.finish_game, self.resize_window, self.activate_menu_frame)
 
     layout.addWidget(self.frame_menu, 1)
     layout.addWidget(self.frame_game, 1)
@@ -67,28 +44,28 @@ class Window(QMainWindow):
     self.setCentralWidget(self.root)
 
     # show menu frame by default
-    self.frame_menu.enable_main_menu()
+    self.activate_menu_frame()
+
+  def activate_menu_frame(self) -> None:
     self.frame_menu.show()
+    self.frame_game.hide()
+    self.frame_menu.activate()
 
-  def start_game(self, mode):
-    print(f'Starting game in mode {mode}')
-    self.frame_menu.reset()
-
-    self.state = GameState(mode)
-
+  def activate_game_frame(self, mode) -> None:
     self.frame_menu.hide()
     self.frame_game.show()
+    self.frame_game.activate(mode)
 
-    self.frame_game.setup_grid(self.state.rows, self.state.cols, self.state.mines, self.state.matrix)
-    self.setFixedSize((self.state.cols + 1) * 40 + 20, (self.state.rows + 1) * 40 + 20)
+  def resize_window(self, width: int, height: int) -> None:
+    self.setFixedSize(width + 20, height + 20)
 
-  def finish_game(self, win: bool):
+  def finish_game(self, win: bool, time: int) -> None:
     msg = QMessageBox(
       parent=self,
       windowTitle='Game Ended',
-      text=win and 'You won!' or 'You lost!',
+      text=win and f'You won!\nFinished in {time} seconds!' or 'Boom! You lost!',
       standardButtons=QMessageBox.Ok,
       defaultButton=QMessageBox.Ok,
-      icon=QMessageBox.Information,
+      icon=win and QMessageBox.Information or QMessageBox.Critical,
     )
     msg.exec()

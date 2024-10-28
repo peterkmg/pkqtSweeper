@@ -1,16 +1,14 @@
 import sys
-
 from PySide6.QtWidgets import QApplication
+from window import GameWindow
 
-from window import Window
 
-
-# making minesweeper game
-def main():
+def main() -> None:
+  """Main entry point for the pkqt Minesweeper game."""
   app = QApplication(sys.argv)
   app.setApplicationName('pkqt Minesweeper')
-  window = Window()
-  window.show()
+  gw = GameWindow()
+  gw.show()
   sys.exit(app.exec())
 
 

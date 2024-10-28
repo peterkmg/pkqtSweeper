@@ -1,3 +1,6 @@
 {
   "ruff.configuration": "ruff.toml",
+  "cSpell.words": [
+    "QLCD"
+  ],
 }
