@@ -1,5 +1,5 @@
 from typing import Callable
-from game import TileEventType, TileButtonState, TileNumberColor, GameState, GameMode
+from game import TileEventType, TileButtonState, TileNumberColor, GameState, GameMode, Cfg
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import (
@@ -22,7 +22,7 @@ class TileButton(QPushButton):
   def __init__(self, text: str, parent: QWidget = None) -> None:
     super().__init__(text, parent)
 
-    self.setFixedSize(QSize(36, 36))
+    self.setFixedSize(QSize(Cfg.game_btn_height - 4, Cfg.game_btn_height - 4))
     self.state = TileButtonState.DEFAULT
     self.setStyleSheet("""
       font-size: 18px;
@@ -35,9 +35,9 @@ class TileButton(QPushButton):
       case TileButtonState.DEFAULT:
         self.setText('')
       case TileButtonState.FLAGGED:
-        self.setText('🚩')
+        self.setText(Cfg.tile_txt_flagged)
       case TileButtonState.QUESTION:
-        self.setText('❓')
+        self.setText(Cfg.tile_txt_question)
 
   def cycle_state(self) -> None:
     self.state = TileButtonState.next(self.state)
@@ -77,11 +77,11 @@ class Tile(QStackedWidget):
     self.__revealed = False
     self.__flagged = False
     self.setStyleSheet('background-color: #f0f0f0;')
-    self.setFixedSize(QSize(40, 40))
+    self.setFixedSize(QSize(Cfg.game_btn_height, Cfg.game_btn_height))
 
     self.__label = QLabel(
       parent=self,
-      text=str(val) if val > 0 else ('💥' if val == -1 else ''),
+      text=str(val) if val > 0 else (Cfg.tile_txt_mine if val == -1 else ''),
       alignment=Qt.AlignCenter,
       styleSheet=(
         f'font-size: 18px; color: rgb{TileNumberColor.by_val(val).value}; font-weight: bold;'
@@ -151,13 +151,16 @@ class GameHeader(QWidget):
 
     layout = QHBoxLayout(self)
 
-    btn_menu = QPushButton(parent=self, text='Menu', clicked=activate_menu)
-    btn_menu.setFixedSize(100, 40)
-    btn_restart = QPushButton(parent=self, text='Restart', clicked=restart)
-    btn_restart.setFixedSize(100, 40)
+    btn_menu = self.__make_button('Menu', activate_menu)
+    btn_restart = self.__make_button('Restart', restart)
 
-    self.__lcd_mines = QLCDNumber(parent=self, digitCount=3, size=QSize(100, 40), mode=QLCDNumber.Dec)
-    self.__lcd_timer = QLCDNumber(parent=self, digitCount=3, size=QSize(100, 40), mode=QLCDNumber.Dec)
+    self.__lcd_mines = QLCDNumber(
+      parent=self, digitCount=3, size=QSize(Cfg.game_btn_width, Cfg.game_btn_height), mode=QLCDNumber.Dec
+    )
+
+    self.__lcd_timer = QLCDNumber(
+      parent=self, digitCount=3, size=QSize(Cfg.game_btn_width, Cfg.game_btn_height), mode=QLCDNumber.Dec
+    )
 
     self.__stopwatch = QTimer(
       parent=self,
@@ -170,6 +173,12 @@ class GameHeader(QWidget):
     layout.addWidget(btn_menu, 1, Qt.AlignCenter)
     layout.addWidget(btn_restart, 1, Qt.AlignCenter)
     layout.addWidget(self.__lcd_timer, 1, Qt.AlignRight)
+
+  def __make_button(self, text: str, callback: Callable) -> QPushButton:
+    btn = QPushButton(parent=self, text=text, clicked=callback)
+    btn.setFixedSize(Cfg.game_btn_width, Cfg.game_btn_height)
+    btn.setStyleSheet('color: black;')
+    return btn
 
   @property
   def mines(self) -> int:
@@ -246,9 +255,9 @@ class GameFrame(QFrame):
       for j in range(self.__state.cols):
         layout.addWidget(Tile(i, j, self.__state.matrix[i][j], self.__handle_tile_event, self.__grid), i, j)
 
-    self.setFixedSize((self.__state.cols + 1) * 40, (self.__state.rows + 1) * 40)
+    self.setFixedSize((self.__state.cols + 1) * Cfg.game_btn_height, (self.__state.rows + 1) * Cfg.game_btn_height)
     self.__header.mines = self.__state.mines
-    self.__resize_callback((self.__state.cols + 1) * 40, (self.__state.rows + 1) * 40)
+    self.__resize_callback((self.__state.cols + 1) * Cfg.game_btn_height, (self.__state.rows + 1) * Cfg.game_btn_height)
     self.__active = True
     self.__header.new_timer()
 

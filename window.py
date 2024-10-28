@@ -1,5 +1,6 @@
 from menu_frame import MenuFrame
 from game_frame import GameFrame
+from game import Cfg
 from PySide6.QtWidgets import (
   QMainWindow,
   QVBoxLayout,
@@ -14,6 +15,7 @@ class GameWindow(QMainWindow):
   def __init__(self) -> None:
     super().__init__()
     self.setWindowTitle('pkqt Minesweeper')
+    self.setStyleSheet('background-color: #f0f0f0;')
 
     self.__root = QWidget(parent=self)
     layout = QVBoxLayout(self.__root)
@@ -38,7 +40,7 @@ class GameWindow(QMainWindow):
     self.__frame_game.activate(mode)
 
   def __resize_window(self, width: int, height: int) -> None:
-    self.setFixedSize(width + 20, height + 20)
+    self.setFixedSize(width + Cfg.win_offset, height + Cfg.win_offset)
 
   def __finish_game(self, win: bool, time: int) -> None:
     msg = f'You won!\nFinished in {time} seconds!' if win else 'Boom! You lost!'

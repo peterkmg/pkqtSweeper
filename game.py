@@ -1,5 +1,18 @@
 import random
 from enum import Enum
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Cfg:
+  win_offset: int = 20
+  menu_grp_height: int = 250
+  menu_btn_height: int = 40
+  game_btn_height: int = 40
+  game_btn_width: int = 100
+  tile_txt_flagged: str = '🚩'
+  tile_txt_question: str = '❓'
+  tile_txt_mine: str = '💥'
 
 
 class GameMode(Enum):
