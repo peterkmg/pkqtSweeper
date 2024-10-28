@@ -250,7 +250,12 @@ class GameFrame(QFrame):
     self.__open_tiles = 0
     self.__win_condition = self.__state.rows * self.__state.cols - self.__state.mines
 
-    layout = self.__grid.layout()
+    layout: QGridLayout = self.__grid.layout()
+    layout.setAlignment(Qt.AlignCenter)
+    layout.setVerticalSpacing(0)
+    layout.setHorizontalSpacing(0)
+    layout.setContentsMargins(14, 0, 0, 0)
+    layout.setSizeConstraint(QGridLayout.SetFixedSize)
     for i in range(self.__state.rows):
       for j in range(self.__state.cols):
         layout.addWidget(Tile(i, j, self.__state.matrix[i][j], self.__handle_tile_event, self.__grid), i, j)

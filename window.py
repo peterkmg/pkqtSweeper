@@ -40,7 +40,7 @@ class GameWindow(QMainWindow):
     self.__frame_game.activate(mode)
 
   def __resize_window(self, width: int, height: int) -> None:
-    self.setFixedSize(width + Cfg.win_offset, height + Cfg.win_offset)
+    self.setFixedSize(width + Cfg.wind_hrz_offset, height + Cfg.wind_vrt_offset)
 
   def __finish_game(self, win: bool, time: int) -> None:
     msg = f'You won!\nFinished in {time} seconds!' if win else 'Boom! You lost!'
