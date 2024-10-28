@@ -5,8 +5,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Cfg:
-  wind_hrz_offset: int = 20
-  wind_vrt_offset: int = 20
+  wind_hrz_offset: int = 0
+  wind_vrt_offset: int = 25
   menu_grp_height: int = 250
   menu_btn_height: int = 40
   game_btn_height: int = 40

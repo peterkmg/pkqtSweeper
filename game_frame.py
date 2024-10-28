@@ -225,10 +225,7 @@ class GameFrame(QFrame):
   ) -> None:
     super().__init__(parent)
 
-    self.setStyleSheet("""
-      margin: 0px 0px;
-      background-color: #f0f0f0f0;
-    """)
+    self.setStyleSheet('background-color: #f0f0f0f0;')
     self.__open_queue: set[Tile] = set()
     self.__grid: QWidget = None
     self.__resize_callback = resize_callback
@@ -236,6 +233,8 @@ class GameFrame(QFrame):
     self.__state = GameState()
 
     layout = QVBoxLayout(self)
+    layout.setAlignment(Qt.AlignTop)
+    layout.setContentsMargins(5, 0, 20, 0)
     self.__header = GameHeader(self.__create_game, activate_menu, self)
     layout.addWidget(self.__header)
 
@@ -254,15 +253,15 @@ class GameFrame(QFrame):
     layout.setAlignment(Qt.AlignCenter)
     layout.setVerticalSpacing(0)
     layout.setHorizontalSpacing(0)
-    layout.setContentsMargins(14, 0, 0, 0)
+    layout.setContentsMargins(8, 0, 0, 0)
     layout.setSizeConstraint(QGridLayout.SetFixedSize)
     for i in range(self.__state.rows):
       for j in range(self.__state.cols):
         layout.addWidget(Tile(i, j, self.__state.matrix[i][j], self.__handle_tile_event, self.__grid), i, j)
 
-    self.setFixedSize((self.__state.cols + 1) * Cfg.game_btn_height, (self.__state.rows + 1) * Cfg.game_btn_height)
+    self.setFixedSize((self.__state.cols + 1) * Cfg.game_btn_height, (self.__state.rows + 2) * Cfg.game_btn_height)
     self.__header.mines = self.__state.mines
-    self.__resize_callback((self.__state.cols + 1) * Cfg.game_btn_height, (self.__state.rows + 1) * Cfg.game_btn_height)
+    self.__resize_callback((self.__state.cols + 1) * Cfg.game_btn_height, (self.__state.rows + 2) * Cfg.game_btn_height)
     self.__active = True
     self.__header.new_timer()
 
