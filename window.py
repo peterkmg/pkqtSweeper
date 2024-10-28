@@ -80,7 +80,7 @@ class Window(QMainWindow):
     self.frame_game.show()
 
     self.frame_game.setup_grid(self.state.rows, self.state.cols, self.state.mines, self.state.matrix)
-    self.setFixedSize((self.state.cols + 1) * 40, (self.state.rows + 1) * 40 + 20)
+    self.setFixedSize((self.state.cols + 1) * 40 + 20, (self.state.rows + 1) * 40 + 20)
 
   def finish_game(self, win: bool):
     msg = QMessageBox(

@@ -1,5 +1,5 @@
 from typing import Callable
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtWidgets import (
   QFrame,
   QVBoxLayout,
@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
   QGridLayout,
   QPushButton,
   QStackedWidget,
+  QLCDNumber,
 )
 from PySide6.QtGui import QMouseEvent
 
@@ -27,7 +28,7 @@ class TileButton(QPushButton):
     self.setStyleSheet("""
       font-size: 18px;
       padding: 5px 10px;
-                       background-color: #e0e0e0;
+      background-color: #e0e0e0;
     """)
 
     self.callback = callback
@@ -42,12 +43,14 @@ class TileButton(QPushButton):
         self.setText('?')
 
   def mousePressEvent(self, event: QMouseEvent) -> None:
+    state_before = self.state
     btn = event.button()
     if btn == Qt.RightButton:
       self.state = TileButtonState.next(self.state)
       self.set_text()
 
-    self.callback(btn, self.state)
+    state_after = self.state
+    self.callback(btn, state_after, state_before)
 
     return super().mousePressEvent(event)
 
@@ -75,9 +78,6 @@ class Tile(QStackedWidget):
     self.setStyleSheet('background-color: #f0f0f0;')
     self.setFixedSize(self.size)
 
-    # layout = QStackedLayout(self)
-    # self.layout = layout
-
     label = QLabel(
       parent=self,
       text=str(val) if val > 0 else ('o' if val == -1 else ''),
@@ -95,21 +95,51 @@ class Tile(QStackedWidget):
 
     self.setCurrentIndex(self.indexOf(btn))
 
-  def handleMouseEvent(self, btn: Qt.MouseButton, state: TileButtonState) -> None:
+  def handleMouseEvent(self, btn: Qt.MouseButton, state: TileButtonState, last_state: TileButtonState) -> None:
     match btn:
       case Qt.LeftButton:
         self.callback(TileEventType.OPENSINGLE, self)
       case Qt.MiddleButton:
         self.callback(TileEventType.OPENSQUARE, self)
       case Qt.RightButton:
-        if state == TileButtonState.FLAGGED:
-          self.protected = True
-        else:
+        if last_state == TileButtonState.FLAGGED and state != TileButtonState.FLAGGED:
           self.protected = False
+        elif state == TileButtonState.FLAGGED and last_state != TileButtonState.FLAGGED:
+          self.protected = True
 
   def reveal_tile(self) -> None:
     self.revealed = True
     self.setCurrentIndex(self.currentIndex() - 1)
+
+
+class GameHeader(QWidget):
+  btn_restart: QPushButton
+  lcd_mines: QLCDNumber
+  lcd_timer: QLCDNumber
+
+  stopwatch: QTimer
+
+  def __init__(self):
+    super().__init__()
+
+    layout = QHBoxLayout(self)
+
+    self.btn_restart = QPushButton(parent=self, text='Restart', size=QSize(150, 100))
+    self.btn_restart.setFixedSize(150, 40)
+    self.lcd_mines = QLCDNumber(parent=self, digitCount=3, size=QSize(100, 40), mode=QLCDNumber.Dec)
+    self.lcd_timer = QLCDNumber(parent=self, digitCount=3, size=QSize(100, 40), mode=QLCDNumber.Dec)
+
+    self.stopwatch = QTimer(parent=self, timeout=self.lcd_timer.display, interval=1000, singleShot=False)
+
+    layout.addWidget(self.lcd_mines, 1, Qt.AlignLeft)
+    layout.addWidget(self.btn_restart, 1, Qt.AlignCenter)
+    layout.addWidget(self.lcd_timer, 1, Qt.AlignRight)
+
+  def set_mines(self, mines: int) -> None:
+    self.lcd_mines.display(mines)
+
+  def start_timer(self) -> None:
+    self.stopwatch.start()
 
 
 class GameFrame(QFrame):
@@ -136,14 +166,14 @@ class GameFrame(QFrame):
 
     layout = QVBoxLayout(self)
 
-    header = QWidget(parent=self, layout=QHBoxLayout())
-    for label, align in [('mines', Qt.AlignLeft), ('icon', Qt.AlignCenter), ('timer', Qt.AlignRight)]:
-      header.layout().addWidget(QLabel(label, header), 1, align)
+    # header = QWidget(parent=self, layout=QHBoxLayout())
+    # for label, align in [('mines', Qt.AlignLeft), ('icon', Qt.AlignCenter), ('timer', Qt.AlignRight)]:
+    #   header.layout().addWidget(QLabel(label, header), 1, align)
 
-    self.header = header
+    self.header = GameHeader()
     self.grid = QWidget(parent=self, layout=QGridLayout())
 
-    layout.addWidget(header)
+    layout.addWidget(self.header)
     layout.addWidget(self.grid)
 
   def setup_grid(self, rows: int, cols: int, mines: int, matrix: list[list[int]]) -> None:
@@ -157,6 +187,7 @@ class GameFrame(QFrame):
         layout.addWidget(Tile(i, j, matrix[i][j], self.handle_tile_event), i, j)
 
     self.setFixedSize((cols + 1) * 40, (rows + 1) * 40)
+    self.header.set_mines(mines)
 
   def handle_tile_event(self, event: TileEventType, tile: Tile) -> None:
     match event:
@@ -164,6 +195,8 @@ class GameFrame(QFrame):
         self.open_single_tile(tile)
       case TileEventType.OPENSQUARE:
         self.open_square(tile)
+      case TileEventType.MARK:
+        self
 
   def open_tile(self, tile: Tile):
     tile.reveal_tile()
