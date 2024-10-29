@@ -43,34 +43,38 @@ class MenuFrame(QFrame):
     self.__show_first_page(True)
 
   def __create_main_menu_group(self) -> QGroupBox:
-    main_group = QGroupBox('Main Menu', parent=self)
-    main_group.setFixedHeight(Cfg.menu_grp_height)
-    main_group_layout = QVBoxLayout(main_group)
+    main_group = self.__make_group('Main Menu')
+    layout = main_group.layout()
 
     btn_new_game = self.__make_button('New Game', lambda: self.__show_first_page(False))
     btn_exit = self.__make_button('Exit', lambda: QApplication.instance().quit())
 
-    main_group_layout.addWidget(btn_new_game)
-    main_group_layout.addWidget(btn_exit)
+    layout.addWidget(btn_new_game)
+    layout.addWidget(btn_exit)
 
     return main_group
 
   def __create_mode_select_group(self, activate_game: Callable[[GameMode], None]) -> QGroupBox:
-    mode_group = QGroupBox('Select difficulty')
-    mode_group.setFixedHeight(Cfg.menu_grp_height)
-    mode_group_layout = QVBoxLayout(mode_group)
+    mode_group = self.__make_group('Select Mode')
+    layout = mode_group.layout()
 
     btn_start_beginner = self.__make_button('Beginner', lambda: activate_game(GameMode.BEGINNER))
     btn_start_intermediate = self.__make_button('Intermediate', lambda: activate_game(GameMode.INTERMEDIATE))
     btn_start_expert = self.__make_button('Expert', lambda: activate_game(GameMode.EXPERT))
     btn_back = self.__make_button('Back', lambda: self.__show_first_page(True))
 
-    mode_group_layout.addWidget(btn_start_beginner)
-    mode_group_layout.addWidget(btn_start_intermediate)
-    mode_group_layout.addWidget(btn_start_expert)
-    mode_group_layout.addWidget(btn_back)
+    layout.addWidget(btn_start_beginner)
+    layout.addWidget(btn_start_intermediate)
+    layout.addWidget(btn_start_expert)
+    layout.addWidget(btn_back)
 
     return mode_group
+
+  def __make_group(self, title: str) -> QGroupBox:
+    grp = QGroupBox(title, parent=self, layout=QVBoxLayout())
+    grp.setFixedHeight(Cfg.menu_grp_height)
+    grp.setStyleSheet('color: black;')
+    return grp
 
   def __make_button(self, text: str, callback: Callable) -> QPushButton:
     btn = QPushButton(

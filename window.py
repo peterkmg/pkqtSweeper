@@ -53,4 +53,5 @@ class GameWindow(QMainWindow):
       standardButtons=QMessageBox.Ok,
       defaultButton=QMessageBox.Ok,
       icon=icon,
+      styleSheet='font-size: 13px; color: black;',
     ).exec()
