@@ -24,16 +24,16 @@ class MenuFrame(QFrame):
       alignment=Qt.AlignCenter,
       parent=self,
       styleSheet="""
-      font-size: 24px;
-      font-weight: bold;
-      color: black;
+        font-size: 24px;
+        font-weight: bold;
+        color: black;
       """,
     )
 
     self.__main_btn_group = self.__create_main_menu_group()
     self.__mode_select_btn_group = self.__create_mode_select_group(activate_game)
 
-    footer = QLabel('Created by PK', parent=self, styleSheet='font-size: 12px; color: black;', alignment=Qt.AlignCenter)
+    footer = QLabel('by pk', parent=self, styleSheet='font-size: 12px; color: black;', alignment=Qt.AlignCenter)
 
     layout.addWidget(header, 1)
     layout.addWidget(self.__main_btn_group)
@@ -91,5 +91,5 @@ class MenuFrame(QFrame):
     self.__mode_select_btn_group.setHidden(flag)
 
   def activate(self) -> None:
-    self.__resize_window_callback(400, 400)
+    self.__resize_window_callback(Cfg.menu_win_size, Cfg.menu_win_size)
     self.__show_first_page(True)
