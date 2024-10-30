@@ -1,6 +1,6 @@
 from menu_frame import MenuFrame
 from game_frame import GameFrame
-from game import Cfg
+from game_utils import Cfg
 from PySide6.QtWidgets import (
   QMainWindow,
   QVBoxLayout,

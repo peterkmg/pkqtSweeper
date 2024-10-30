@@ -1,5 +1,5 @@
 from typing import Callable
-from game import Cfg, GameMode
+from game_utils import Cfg, GameMode
 from PySide6.QtWidgets import QFrame, QVBoxLayout, QLabel, QGroupBox, QPushButton, QApplication
 from PySide6.QtCore import Qt
 

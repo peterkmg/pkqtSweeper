@@ -1,5 +1,5 @@
 from typing import Callable
-from game import TileEventType, TileButtonState, TileNumberColor, GameState, GameMode, Cfg
+from game_utils import TileEventType, TileButtonState, TileNumberColor, Board, GameMode, Cfg
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import (
@@ -63,33 +63,24 @@ class Tile(QStackedWidget):
     '__revealed',
     '__flagged',
     '__tile_event_callback',
+    '__neighbors',
   )
 
   def __init__(
-    self, row: int, col: int, val: int, callback: Callable[[TileEventType, 'Tile'], None], parent: QWidget = None
+    self, row: int, col: int, callback: Callable[[TileEventType, 'Tile'], None], parent: QWidget = None
   ) -> None:
     super().__init__(parent)
 
     self.__row = row
     self.__col = col
-    self.__val = val
+    self.__val = 0
     self.__tile_event_callback = callback
     self.__revealed = False
     self.__flagged = False
     self.setStyleSheet('background-color: #f0f0f0;')
     self.setFixedSize(QSize(Cfg.game_btn_height, Cfg.game_btn_height))
 
-    self.__label = QLabel(
-      parent=self,
-      text=str(val) if val > 0 else (Cfg.tile_txt_mine if val == -1 else ''),
-      alignment=Qt.AlignCenter,
-      styleSheet=(
-        f'font-size: 18px; color: rgb{TileNumberColor.by_val(val).value}; font-weight: bold;'
-        if val > 0
-        else 'font-size: 18px;font-weight: bold;'
-      ),
-    )
-
+    self.__label = QLabel(parent=self, text='', alignment=Qt.AlignCenter)
     self.__btn = TileButton(text='', parent=self)
 
     self.addWidget(self.__label)
@@ -112,6 +103,10 @@ class Tile(QStackedWidget):
   def val(self) -> int:
     return self.__val
 
+  @val.setter
+  def val(self, value: int) -> None:
+    self.__val = value
+
   @property
   def flagged(self) -> bool:
     return self.__flagged
@@ -119,6 +114,27 @@ class Tile(QStackedWidget):
   @property
   def revealed(self) -> bool:
     return self.__revealed
+
+  @property
+  def neighbors(self) -> list['Tile']:
+    return self.__neighbors
+
+  @neighbors.setter
+  def neighbors(self, value: list['Tile']) -> None:
+    self.__neighbors = value
+
+  def init(self) -> None:
+    self.__label.setText(Cfg.tile_txt_mine if self.__val == -1 else str(self.__val))
+    self.__label.setStyleSheet(
+      'font-size: 18px; font-weight: bold;'
+      if self.__val == -1
+      else f'color: rgb{TileNumberColor.by_val(self.__val).value}; font-size: 18px; font-weight: bold;'
+    )
+
+  def increment_value(self) -> None:
+    if self.__val == -1:
+      return
+    self.__val += 1
 
   def mouseReleaseEvent(self, event: QMouseEvent) -> None:
     match event.button():
@@ -138,7 +154,7 @@ class Tile(QStackedWidget):
     elif self.__btn.state == TileButtonState.FLAGGED and not self.__flagged:
       self.__flagged = True
 
-  def reveal_tile(self) -> None:
+  def reveal(self) -> None:
     self.__revealed = True
     self.setCurrentIndex(self.__label_idx)
 
@@ -188,8 +204,15 @@ class GameHeader(QWidget):
   def mines(self, value: int) -> None:
     self.__lcd_mines.display(value)
 
-  def new_timer(self) -> None:
-    self.__lcd_timer.display(0)
+  @property
+  def time(self) -> int:
+    return self.__lcd_timer.intValue()
+
+  @time.setter
+  def time(self, value: int) -> None:
+    self.__lcd_timer.display(value)
+
+  def start_timer(self) -> None:
     self.__stopwatch.start()
 
   def halt_timer(self) -> int:
@@ -207,10 +230,15 @@ class GameFrame(QFrame):
   __slots__ = (
     '__header',
     '__grid',
-    '__state',
+    '__board',
+    '__tiles',
     '__active',
+    '__active_tiles',
+    '__first_click',
     '__open_tiles',
     '__win_condition',
+    '__game_won',
+    '__game_lost',
     '__resize_callback',
     '__finish_callback',
     '__open_queue',
@@ -227,18 +255,30 @@ class GameFrame(QFrame):
 
     self.setStyleSheet('background-color: #f0f0f0f0;')
     self.__open_queue: set[Tile] = set()
+    self.__active = False
     self.__grid: QWidget = None
     self.__resize_callback = resize_callback
     self.__finish_callback = finish_callback
-    self.__state = GameState()
 
     layout = QVBoxLayout(self)
     layout.setAlignment(Qt.AlignTop)
     layout.setContentsMargins(5, 0, 20, 0)
-    self.__header = GameHeader(self.__create_game, activate_menu, self)
+    self.__header = GameHeader(self.__init_game, activate_menu, self)
     layout.addWidget(self.__header)
 
-  def __render_grid(self) -> None:
+  def __init_params(self) -> None:
+    self.__first_click = True
+    self.__open_tiles = 0
+    self.__game_won = False
+    self.__game_lost = False
+    self.__win_condition = self.__board.rows * self.__board.cols - self.__board.mines
+    self.__active_tiles: set[Tile] = set()
+
+  def __init_header(self) -> None:
+    self.__header.mines = self.__board.mines
+    self.__header.time = 0
+
+  def __init_grid(self) -> None:
     if self.__grid is not None:
       self.layout().removeWidget(self.__grid)
       self.__grid.deleteLater()
@@ -246,28 +286,36 @@ class GameFrame(QFrame):
     self.__grid = QWidget(parent=self, layout=QGridLayout())
     self.layout().addWidget(self.__grid)
 
-    self.__open_tiles = 0
-    self.__win_condition = self.__state.rows * self.__state.cols - self.__state.mines
-
     layout: QGridLayout = self.__grid.layout()
     layout.setAlignment(Qt.AlignCenter)
     layout.setVerticalSpacing(0)
     layout.setHorizontalSpacing(0)
     layout.setContentsMargins(8, 0, 0, 0)
     layout.setSizeConstraint(QGridLayout.SetFixedSize)
-    for i in range(self.__state.rows):
-      for j in range(self.__state.cols):
-        layout.addWidget(Tile(i, j, self.__state.matrix[i][j], self.__handle_tile_event, self.__grid), i, j)
+    self.setFixedSize((self.__board.cols + 1) * Cfg.game_btn_height, (self.__board.rows + 2) * Cfg.game_btn_height)
 
-    self.setFixedSize((self.__state.cols + 1) * Cfg.game_btn_height, (self.__state.rows + 2) * Cfg.game_btn_height)
-    self.__header.mines = self.__state.mines
-    self.__resize_callback((self.__state.cols + 1) * Cfg.game_btn_height, (self.__state.rows + 2) * Cfg.game_btn_height)
+  def __init_tiles(self) -> None:
+    self.__init_grid()
+    layout: QGridLayout = self.__grid.layout()
+
+    tiles = [
+      [Tile(i, j, self.__handle_tile_event, self.__grid) for j in range(self.__board.cols)]
+      for i in range(self.__board.rows)
+    ]
+
+    for row in tiles:
+      for t in row:
+        t.neighbors = [tiles[i][j] for i, j in self.__board.get_neighbors(t.row, t.col)]
+        layout.addWidget(t, t.row, t.col)
+
+    self.__tiles = tiles
+
+  def __init_game(self) -> None:
+    self.__init_params()
+    self.__init_tiles()
+    self.__init_header()
+    self.__resize_callback((self.__board.cols + 1) * Cfg.game_btn_height, (self.__board.rows + 2) * Cfg.game_btn_height)
     self.__active = True
-    self.__header.new_timer()
-
-  def __create_game(self) -> None:
-    self.__state.create_state()
-    self.__render_grid()
 
   def __handle_tile_event(self, event: TileEventType, tile: Tile) -> None:
     if not self.__active:
@@ -281,45 +329,61 @@ class GameFrame(QFrame):
       case TileEventType.MARK:
         self.__process_mark(tile)
 
-  def __open_tile(self, tile: Tile) -> None:
-    tile.reveal_tile()
-    self.__open_tiles += 1
-
-    if tile.val == -1 or self.__open_tiles == self.__win_condition:
-      self.__active = False
-      self.__finish_callback(tile.val != -1, self.__header.halt_timer())
-
-  def __process_tile(self, tile: Tile) -> None:
+  def __reveal_tile(self, tile: Tile) -> None:
     if tile.flagged or tile.revealed:
       return
 
-    self.__open_tile(tile)
+    tile.reveal()
+    self.__open_tiles += 1
+
+    if tile.val == -1:
+      self.__game_lost = True
+    elif self.__open_tiles == self.__win_condition:
+      self.__game_won = True
 
     if tile.val == 0:
       self.__enqueue_adjacent(tile)
 
     self.__process_queue()
 
+  def __process_tile(self, tile: Tile) -> None:
+    if self.__first_click:
+      self.__handle_first_click(tile)
+
+    if tile.flagged or tile.revealed:
+      return
+
+    self.__reveal_tile(tile)
+    self.__post_process_tile()
+
+  def __post_process_tile(self) -> None:
+    if not self.__game_lost and not self.__game_won:
+      return
+
+    self.__active = False
+    if self.__game_lost:
+      for row in self.__tiles:
+        for t in row:
+          if t.val == -1:
+            t.reveal()
+
+    self.__finish_callback(not self.__game_lost, self.__header.halt_timer())
+
   def __process_square(self, tile: Tile) -> None:
-    layout = self.__grid.layout()
-    flagged = 0
-    tiles = set()
-    for i in range(-1, 2):
-      for j in range(-1, 2):
-        x = tile.row + i
-        y = tile.col + j
+    if not tile.revealed or tile.val == 0:
+      return
 
-        if x < 0 or x >= self.__state.rows or y < 0 or y >= self.__state.cols:
-          continue
+    mines = 0
+    for t in tile.neighbors:
+      if t.flagged:
+        mines += 1
 
-        if layout.itemAtPosition(x, y).widget().flagged:
-          flagged += 1
-        else:
-          tiles.add(layout.itemAtPosition(x, y).widget())
+    if mines == tile.val:
+      for t in tile.neighbors:
+        if not t.flagged and not t.revealed:
+          self.__reveal_tile(t)
 
-    if flagged == tile.val:
-      self.__open_queue = self.__open_queue.union(tiles)
-      self.__process_queue()
+    self.__post_process_tile()
 
   def __process_mark(self, tile: Tile) -> None:
     if not tile.revealed:
@@ -331,25 +395,31 @@ class GameFrame(QFrame):
         self.__header.decrement_mines()
 
   def __enqueue_adjacent(self, tile) -> None:
-    layout = self.__grid.layout()
-    for i in range(-1, 2):
-      for j in range(-1, 2):
-        if i == 0 and j == 0:
-          continue
-
-        x = tile.row + i
-        y = tile.col + j
-
-        if x < 0 or x >= self.__state.rows or y < 0 or y >= self.__state.cols:
-          continue
-
-        self.__open_queue.add(layout.itemAtPosition(x, y).widget())
+    for t in tile.neighbors:
+      if not t.revealed:
+        self.__open_queue.add(t)
 
   def __process_queue(self) -> None:
     while self.__open_queue:
       tile = self.__open_queue.pop()
-      self.__process_tile(tile)
+      self.__reveal_tile(tile)
+
+  def __handle_first_click(self, tile: Tile) -> None:
+    self.__first_click = False
+    self.__board.calc_mine_placement(tile.row, tile.col)
+
+    for r, c in self.__board.mine_placement:
+      self.__tiles[r][c].val = -1
+      self.__active_tiles.add(self.__tiles[r][c])
+      for t in self.__tiles[r][c].neighbors:
+        t.increment_value()
+        self.__active_tiles.add(t)
+
+    for t in self.__active_tiles:
+      t.init()
+
+    self.__header.start_timer()
 
   def activate(self, mode: GameMode) -> None:
-    self.__state.mode = mode
-    self.__create_game()
+    self.__board = Board(mode)
+    self.__init_game()

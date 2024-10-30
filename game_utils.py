@@ -41,7 +41,6 @@ class TileEventType(Enum):
   MARK = 2
 
 
-# rgb
 class TileNumberColor(Enum):
   # 1 is blue
   ONE = (0, 0, 255)
@@ -74,8 +73,8 @@ class TileNumberColor(Enum):
     }[val]
 
 
-class GameState:
-  __slots__ = ('__mode', '__rows', '__cols', '__mines', '__matrix')
+class Board:
+  __slots__ = ('__rows', '__cols', '__mines', '__coords', '__mine_placement')
 
   @property
   def rows(self) -> int:
@@ -90,33 +89,36 @@ class GameState:
     return self.__mines
 
   @property
-  def matrix(self) -> list[list[int]]:
-    return self.__matrix
-
-  @property
   def mode(self) -> GameMode:
     return self.__mode
 
-  @mode.setter
-  def mode(self, mode: GameMode) -> None:
-    self.__mode = mode
+  @property
+  def mine_placement(self) -> list[tuple[int, int]]:
+    return self.__mine_placement
 
-  def create_state(self) -> None:
-    if self.__mode is None:
-      raise ValueError('Game mode is not set')
+  def __init__(self, mode: GameMode) -> None:
+    (self.__mines, self.__rows, self.__cols) = mode.value
+    self.__coords = {(i, j) for i in range(self.__rows) for j in range(self.__cols)}
 
-    (self.__mines, self.__rows, self.__cols) = self.__mode.value
+  def calc_mine_placement(self, row: int, col: int) -> None:
+    neighborhood = self.get_square(row, col)
+    safe_coords = list(self.__coords.difference(neighborhood))
+    self.__mine_placement = random.sample(safe_coords, self.__mines)
 
-    mine_list = random.sample(range(self.__rows * self.__cols), self.__mines)
-    mine_list.sort()
-    self.__matrix = [
-      [-1 if (i * self.__cols + j) in mine_list else 0 for j in range(self.__cols)] for i in range(self.__rows)
+  def in_bounds(self, x: int, y: int) -> bool:
+    return 0 <= x < self.__cols and 0 <= y < self.__rows
+
+  def get_neighbors(self, row: int, col: int) -> list[tuple[int, int]]:
+    return [
+      (i, j)
+      for i in range(max(0, row - 1), min(self.__rows, row + 2))
+      for j in range(max(0, col - 1), min(self.__cols, col + 2))
+      if (i, j) != (row, col)
     ]
 
-    for row in range(self.__rows):
-      for col in range(self.__cols):
-        if self.__matrix[row][col] == -1:
-          for y in range(max(0, row - 1), min(self.__rows, row + 2)):
-            for x in range(max(0, col - 1), min(self.__cols, col + 2)):
-              if self.__matrix[y][x] != -1:
-                self.__matrix[y][x] += 1
+  def get_square(self, row: int, col: int) -> list[tuple[int, int]]:
+    return [
+      (i, j)
+      for i in range(max(0, row - 1), min(self.__rows, row + 2))
+      for j in range(max(0, col - 1), min(self.__cols, col + 2))
+    ]
