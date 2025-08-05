@@ -139,7 +139,10 @@ class Tile(QStackedWidget):
   def mouseReleaseEvent(self, event: QMouseEvent) -> None:
     match event.button():
       case Qt.LeftButton:  # left click, only care if tile is not revealed or protected
-        self.__tile_event_callback(TileEventType.OPENSINGLE, self)
+        if not self.__revealed and not self.__flagged:
+          self.__tile_event_callback(TileEventType.OPENSINGLE, self)
+        elif self.__revealed:
+          self.__tile_event_callback(TileEventType.OPENSQUARE, self)
       case Qt.MiddleButton:  # middle click, only care if tile is revealed
         self.__tile_event_callback(TileEventType.OPENSQUARE, self)
       case Qt.RightButton:  # right click, only care if tile is not revealed
