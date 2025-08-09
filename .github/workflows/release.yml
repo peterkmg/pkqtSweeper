@@ -14,9 +14,6 @@ jobs:
           - os: ubuntu-latest
             arch: x64
             python-arch: x64
-          - os: ubuntu-latest
-            arch: arm64
-            python-arch: aarch64
           - os: macos-latest
             arch: x64
             python-arch: x64
@@ -34,6 +31,7 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install pyinstaller
           pip install -r requirements.txt
       - name: Build executable with PyInstaller
         run: |
@@ -42,7 +40,22 @@ jobs:
         shell: bash
         run: |
           OUTPUT_NAME="pkqtSweeper"
-          FILE_NAME="${OUTPUT_NAME}-${{ matrix.os }}-${{ matrix.arch }}"
+          # Map runner names to cleaner OS names
+          case "${{ matrix.os }}" in
+            "ubuntu-latest")
+              OS_NAME="linux"
+              ;;
+            "macos-latest")
+              OS_NAME="macos"
+              ;;
+            "windows-latest")
+              OS_NAME="windows"
+              ;;
+            *)
+              OS_NAME="${{ matrix.os }}"
+              ;;
+          esac
+          FILE_NAME="${OUTPUT_NAME}-${OS_NAME}-${{ matrix.arch }}"
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             mv dist/main.exe "${FILE_NAME}.exe"
           else
@@ -52,7 +65,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pkqtSweeper-executables
-          path: "${OUTPUT_NAME}-${{ matrix.os }}-${{ matrix.arch }}${{ endsWith(matrix.os, 'windows-latest') && '.exe' || '' }}"
+          path: "pkqtSweeper-*"
   create-release:
     name: Create GitHub Release
     needs: build
@@ -74,10 +87,10 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            pkqtSweeper-windows-latest-x64.exe
-            pkqtSweeper-ubuntu-latest-x64
-            pkqtSweeper-ubuntu-latest-arm64
-            pkqtSweeper-macos-latest-x64
+            pkqtSweeper-windows-x64.exe
+            pkqtSweeper-linux-x64
+            pkqtSweeper-linux-arm64
+            pkqtSweeper-macos-x64
           body: ${{ steps.changelog.outputs.changelog }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
