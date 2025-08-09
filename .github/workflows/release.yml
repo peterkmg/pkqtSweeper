@@ -64,7 +64,7 @@ jobs:
       - name: Upload executable as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pkqtSweeper-executables
+          name: pkqtSweeper-${{ matrix.os }}-${{ matrix.arch }}
           path: "pkqtSweeper-*"
   create-release:
     name: Create GitHub Release
@@ -74,7 +74,7 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          name: pkqtSweeper-executables
+          merge-multiple: true
           path: .
       - name: Generate Changelog
         id: changelog
