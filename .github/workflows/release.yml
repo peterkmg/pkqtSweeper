@@ -1,0 +1,83 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+jobs:
+  build:
+    name: Build ${{ matrix.os }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x64
+            python-arch: x64
+          - os: ubuntu-latest
+            arch: arm64
+            python-arch: aarch64
+          - os: macos-latest
+            arch: x64
+            python-arch: x64
+          - os: windows-latest
+            arch: x64
+            python-arch: x64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: ${{ matrix.python-arch }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Build executable with PyInstaller
+        run: |
+          pyinstaller --onefile --windowed --collect-all PySide6 main.py
+      - name: Rename executable for release
+        shell: bash
+        run: |
+          OUTPUT_NAME="pkqtSweeper"
+          FILE_NAME="${OUTPUT_NAME}-${{ matrix.os }}-${{ matrix.arch }}"
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            mv dist/main.exe "${FILE_NAME}.exe"
+          else
+            mv dist/main "${FILE_NAME}"
+          fi
+      - name: Upload executable as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pkqtSweeper-executables
+          path: "${OUTPUT_NAME}-${{ matrix.os }}-${{ matrix.arch }}${{ endsWith(matrix.os, 'windows-latest') && '.exe' || '' }}"
+  create-release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: pkqtSweeper-executables
+          path: .
+      - name: Generate Changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v4
+        with:
+          commitMode: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create and Upload Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            pkqtSweeper-windows-latest-x64.exe
+            pkqtSweeper-ubuntu-latest-x64
+            pkqtSweeper-ubuntu-latest-arm64
+            pkqtSweeper-macos-latest-x64
+          body: ${{ steps.changelog.outputs.changelog }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
