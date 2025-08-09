@@ -3,6 +3,9 @@ on:
   push:
     tags:
       - 'v*'
+
+permissions:
+  contents: write
 jobs:
   build:
     name: Build ${{ matrix.os }} ${{ matrix.arch }}
@@ -86,11 +89,7 @@ jobs:
       - name: Create and Upload Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            pkqtSweeper-windows-x64.exe
-            pkqtSweeper-linux-x64
-            pkqtSweeper-linux-arm64
-            pkqtSweeper-macos-x64
+          files: "pkqtSweeper-*"
           body: ${{ steps.changelog.outputs.changelog }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
